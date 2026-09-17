@@ -11,15 +11,395 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-   <script>
-        // --- STATE MANAGEMENT ---
-        // 1. PASTE URL DARI GOOGLE APPS SCRIPT DI SINI (Di dalam tanda kutip)
-        const scriptURL = 'https://script.google.com/macros/s/AKfycbwt7TkarvKHxn-Os6Cu4QhRwNXLgs_qsb8FMhJkFYTm6_fYLuoNd__OYimDJ8Wmo7FA/exec'; 
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6;
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+        .fade-in {
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        /* Custom scrollbar for table */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+    </style>
+</head>
+<body class="text-gray-800 antialiased selection:bg-primary-200 selection:text-primary-800">
 
-        // Data lokal ini sekarang hanya digunakan untuk demo halaman Admin
+    <!-- Toast Notification (Pengganti Alert) -->
+    <div id="toast-container" class="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 flex flex-col gap-2 w-11/12 max-w-md pointer-events-none"></div>
+
+    <!-- VIEW: LOGIN -->
+    <div id="login-view" class="min-h-screen flex flex-col items-center justify-center p-4 fade-in">
+        <div class="mb-8 text-center">
+            <div class="w-16 h-16 bg-primary-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-500/30">
+                <i class="fas fa-graduation-cap text-3xl text-white"></i>
+            </div>
+            <h1 class="text-2xl font-bold text-gray-900 tracking-tight">Portal Hasil Asesmen</h1>
+            <p class="text-sm text-gray-500 mt-1">Sistem Pengumuman Ketuntasan Belajar</p>
+        </div>
+
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            <div class="p-6 sm:p-8">
+                <!-- Form Siswa -->
+                <form id="form-siswa" onsubmit="handleLoginSiswa(event)" class="space-y-5 block fade-in">
+                    <p class="text-sm font-bold text-gray-800 mb-6 text-center">Silakan masuk menggunakan NIS dan Kelas Anda.</p>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Nomor Induk Siswa (NIS)</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-user text-gray-400"></i>
+                            </div>
+                            <input type="text" id="nis" required placeholder="Contoh: 123456" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Kelas</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-door-closed text-gray-400"></i>
+                            </div>
+                            <input type="password" id="kelas" required placeholder="Contoh: 10-A" class="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-all">
+                            <button type="button" onclick="togglePassword('kelas')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-eye" id="eye-kelas"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-primary-600 hover:bg-primary-700 text-white font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all flex justify-center items-center gap-2">
+                        <span>Lihat Hasil</span> <i class="fas fa-arrow-right"></i>
+                    </button>
+                </form>
+
+                <!-- Form Admin -->
+                <form id="form-admin" onsubmit="handleLoginAdmin(event)" class="space-y-5 hidden fade-in">
+                    <p class="text-sm text-gray-600 mb-2">Login khusus untuk Guru dan Staf TU.</p>
+                    
+                    <div class="bg-gray-100 text-gray-700 text-xs p-3 rounded-lg border border-gray-200 mb-4">
+                        <i class="fas fa-key mr-1"></i> Username: <strong>admin</strong> | Password: <strong>admin123</strong>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Username Admin</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-shield-alt text-gray-400"></i>
+                            </div>
+                            <input type="text" id="admin-user" required placeholder="Masukkan username" class="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-800 focus:border-gray-800 transition-all">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <i class="fas fa-lock text-gray-400"></i>
+                            </div>
+                            <input type="password" id="admin-pass" required placeholder="••••••••" class="w-full pl-10 pr-10 py-2.5 bg-gray-50 border border-gray-300 rounded-xl focus:ring-2 focus:ring-gray-800 focus:border-gray-800 transition-all">
+                            <button type="button" onclick="togglePassword('admin-pass')" class="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600">
+                                <i class="fas fa-eye" id="eye-admin-pass"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-3 rounded-xl shadow-md hover:shadow-lg transition-all flex justify-center items-center gap-2">
+                        <span>Login Admin</span> <i class="fas fa-sign-in-alt"></i>
+                    </button>
+                </form>
+            </div>
+            
+            <div class="bg-gray-50 py-4 px-6 text-center border-t border-gray-100">
+                <p class="text-sm text-gray-500 font-medium">Supported by RuruAlbernEdu</p>
+                <!-- Indikator Koneksi Google Sheet -->
+                <div id="sync-status" class="text-xs text-gray-500 mt-2 font-medium transition-all duration-300">
+                    <i class="fas fa-database"></i> Menunggu koneksi data...
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW: STUDENT DASHBOARD -->
+    <div id="student-view" class="hidden min-h-screen bg-gray-100 pb-12 fade-in">
+        <!-- Top Bar -->
+        <nav class="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-10">
+            <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-2">
+                        <div class="w-8 h-8 bg-primary-600 rounded flex items-center justify-center">
+                            <i class="fas fa-graduation-cap text-white text-sm"></i>
+                        </div>
+                        <span class="font-bold text-gray-800 hidden sm:block">Portal Asesmen</span>
+                    </div>
+                    <button onclick="logout()" class="text-gray-500 hover:text-red-600 font-medium text-sm flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-red-50 transition-colors">
+                        <span class="hidden sm:inline">Keluar</span>
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+            <!-- Header Section -->
+            <div class="mb-6">
+                <h2 class="text-2xl sm:text-3xl font-extrabold text-gray-900">Halo, <span id="student-name-display" class="text-primary-600">Siswa</span>!</h2>
+                <p class="text-gray-600 mt-1 font-bold">Berikut adalah hasil asesmen Anda</p>
+            </div>
+
+            <!-- Identity Card -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-4 mb-6 flex flex-wrap gap-4 sm:gap-8 items-center">
+                <div>
+                    <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">NIS</p>
+                    <p class="font-semibold text-gray-800" id="student-nis-display">-</p>
+                </div>
+                <div class="w-px h-8 bg-gray-200 hidden sm:block"></div>
+                <div>
+                    <p class="text-xs text-gray-500 font-medium uppercase tracking-wider">Kelas</p>
+                    <p class="font-semibold text-gray-800" id="student-class-display">-</p>
+                </div>
+            </div>
+
+            <!-- Result Card -->
+            <div class="bg-white rounded-2xl shadow-lg overflow-hidden border border-gray-100 relative">
+                <!-- Status Banner (Dynamic Color) -->
+                <div id="status-banner" class="py-4 px-6 text-center text-white flex flex-col items-center justify-center">
+                    <i id="status-icon" class="fas fa-check-circle text-4xl mb-2"></i>
+                    <h3 id="status-text" class="text-xl font-bold tracking-wide uppercase">STATUS</h3>
+                </div>
+
+                <div class="p-8 text-center">
+                    <p class="text-sm text-gray-500 font-medium uppercase tracking-widest mb-2">Nilai Akhir</p>
+                    <!-- Main Score -->
+                    <div class="text-7xl sm:text-8xl font-black text-gray-900 mb-6 drop-shadow-sm" id="student-score-display">0</div>
+                    
+                    <div class="grid grid-cols-2 gap-4 max-w-sm mx-auto">
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <p class="text-xs text-gray-500 uppercase font-medium mb-1">Predikat</p>
+                            <p class="text-2xl font-bold text-gray-800" id="student-grade-display">-</p>
+                        </div>
+                        <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
+                            <p class="text-xs text-gray-500 uppercase font-medium mb-1">Peringkat</p>
+                            <p class="text-2xl font-bold text-gray-800"><span id="student-rank-display">-</span> <span class="text-sm font-normal text-gray-500">/<span id="total-students-class">-</span></span></p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Section -->
+                <div id="action-section" class="bg-gray-50 border-t border-gray-100 p-6 text-center">
+                    <!-- Dinamis diisi lewat JS -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- VIEW: ADMIN DASHBOARD -->
+    <div id="admin-view" class="hidden min-h-screen bg-gray-100 pb-12 fade-in">
+        <!-- Top Bar -->
+        <nav class="bg-gray-900 text-white shadow-md sticky top-0 z-10">
+            <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex justify-between h-16 items-center">
+                    <div class="flex items-center gap-3">
+                        <div class="w-8 h-8 bg-gray-700 rounded flex items-center justify-center">
+                            <i class="fas fa-shield-alt text-white text-sm"></i>
+                        </div>
+                        <span class="font-bold hidden sm:block">Admin Dashboard</span>
+                    </div>
+                    <button onclick="logout()" class="text-gray-300 hover:text-white font-medium text-sm flex items-center gap-2 px-3 py-1.5 rounded-lg hover:bg-gray-800 transition-colors">
+                        <span class="hidden sm:inline">Keluar</span>
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <main class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 mt-8">
+            <div class="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-2xl font-bold text-gray-900">Ringkasan Data</h2>
+                    <p class="text-gray-600 text-sm">Kelola data nilai siswa secara massal.</p>
+                </div>
+            </div>
+
+            <!-- Stats Row -->
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center text-xl">
+                        <i class="fas fa-users"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Total Siswa</p>
+                        <p class="text-2xl font-bold text-gray-900" id="stat-total">0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-green-100 text-green-600 rounded-full flex items-center justify-center text-xl">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Tuntas</p>
+                        <p class="text-2xl font-bold text-gray-900" id="stat-tuntas">0</p>
+                    </div>
+                </div>
+                <div class="bg-white p-5 rounded-xl border border-gray-200 shadow-sm flex items-center gap-4">
+                    <div class="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center text-xl">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500 font-medium">Remedial</p>
+                        <p class="text-2xl font-bold text-gray-900" id="stat-remedial">0</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Upload Section -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 mb-8 overflow-hidden">
+                <div class="p-5 sm:p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                        <h3 class="text-lg font-bold text-gray-900">Unggah Data Nilai</h3>
+                        <p class="text-sm text-gray-500">Format yang didukung: .csv</p>
+                    </div>
+                    <button onclick="downloadCSVTemplate()" class="text-sm bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors flex items-center gap-2">
+                        <i class="fas fa-download"></i> Unduh Template CSV
+                    </button>
+                </div>
+                <div class="p-6">
+                    <div class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:bg-gray-50 transition-colors relative">
+                        <input type="file" id="csv-file-input" accept=".csv" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="handleFileUpload(event)">
+                        <div class="pointer-events-none">
+                            <i class="fas fa-cloud-upload-alt text-4xl text-primary-500 mb-3"></i>
+                            <p class="text-gray-700 font-medium mb-1">Klik atau seret file CSV ke sini</p>
+                            <p class="text-xs text-gray-500">Pastikan kolom sesuai template (nis, nama, kelas, nilai, dll)</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Data Table Preview -->
+            <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div class="p-5 border-b border-gray-100 flex justify-between items-center">
+                    <h3 class="text-lg font-bold text-gray-900">Pratinjau Data Saat Ini</h3>
+                    <button onclick="clearData()" class="text-sm text-red-600 hover:text-red-800 font-medium">Hapus Semua Data</button>
+                </div>
+                <div class="overflow-x-auto custom-scrollbar max-h-96">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="bg-gray-50 text-gray-600 sticky top-0 border-b border-gray-200">
+                            <tr>
+                                <th class="px-6 py-3 font-semibold">NIS</th>
+                                <th class="px-6 py-3 font-semibold">Nama Siswa</th>
+                                <th class="px-6 py-3 font-semibold">Kelas</th>
+                                <th class="px-6 py-3 font-semibold">Nilai</th>
+                                <th class="px-6 py-3 font-semibold">Predikat</th>
+                                <th class="px-6 py-3 font-semibold">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="admin-table-body" class="divide-y divide-gray-100">
+                            <!-- Rows generated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+                <div id="empty-state" class="hidden p-8 text-center text-gray-500">
+                    <i class="fas fa-folder-open text-3xl mb-2 text-gray-300"></i>
+                    <p>Belum ada data siswa. Silakan unggah CSV.</p>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // --- STATE MANAGEMENT ---
+        // MASUKKAN URL CSV GOOGLE SHEETS ANDA DI SINI
+        const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS6mKt544B50EZW0v0Rl5G-0kpHJAQkm2zcizk88vukI-lVeQQjos3boCdcDV4h17TWm7LrKFmXb8VE/pub?gid=0&single=true&output=csv"; 
+
+        // Data awal dikosongkan karena akan diisi dari Google Sheets
         let studentsData = [];
-        let currentUser = null; 
+        let currentUser = null; // null | { role: 'student', data: {...} } | { role: 'admin' }
+
+        // Batas nilai minimal tuntas
         const KKM = 75;
+
+        // Fungsi untuk mengambil data otomatis dari Google Sheets
+        async function fetchGoogleSheetData() {
+            const syncStatus = document.getElementById('sync-status');
+            const url = GOOGLE_SHEET_CSV_URL;
+
+            if (url === "URL_CSV_ANDA_DISINI" || !url || url.trim() === "") {
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500"></i> URL Google Sheet belum diisi';
+                return;
+            }
+
+            // Validasi apakah URL yang dimasukkan benar-benar link Publikasi CSV
+            if (!url.includes('/pub') && !url.includes('export?format=csv')) {
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> Link salah! Gunakan link "Publikasikan ke web" (.csv)';
+                return;
+            }
+
+            try {
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin text-primary-500"></i> Menghubungkan ke Google Sheets...';
+                
+                // Fetch data dari URL CSV
+                const response = await fetch(url);
+                if (!response.ok) throw new Error("Gagal mengakses jaringan");
+                const csvText = await response.text();
+                
+                // Cegah error jika ternyata yang dikembalikan adalah halaman HTML (bukan CSV)
+                if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.trim().startsWith('<html')) {
+                    throw new Error("Link mengarah ke halaman web, bukan data CSV.");
+                }
+
+                // Parsing data menggunakan fungsi yang sudah kita buat
+                parseAndSetData(csvText, true);
+                
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Terhubung dengan Google Sheets';
+            } catch (error) {
+                console.error("Error fetching Google Sheet:", error);
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> Gagal mengambil data (Periksa link/koneksi)';
+                showToast("Gagal menghubungkan. Pastikan link Google Sheet sudah dipublikasikan sebagai CSV.", "error");
+            }
+        }
+
+        // Jalankan fetch saat halaman web pertama kali dimuat
+        document.addEventListener("DOMContentLoaded", fetchGoogleSheetData);
 
         // --- UI UTILITIES ---
         function showToast(message, type = 'error') {
@@ -39,7 +419,13 @@
             `;
             
             container.appendChild(toast);
-            requestAnimationFrame(() => toast.classList.remove('translate-y-[-20px]', 'opacity-0'));
+            
+            // Animate in
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-[-20px]', 'opacity-0');
+            });
+
+            // Auto remove after 4 seconds
             setTimeout(() => {
                 toast.classList.add('opacity-0');
                 setTimeout(() => toast.remove(), 300);
@@ -81,42 +467,21 @@
         }
 
         // --- AUTH LOGIC ---
-        // 2. FUNGSI LOGIN SISWA YANG TERHUBUNG KE GOOGLE SHEETS
-        async function handleLoginSiswa(e) {
+        function handleLoginSiswa(e) {
             e.preventDefault();
             const nisInput = document.getElementById('nis').value.trim();
             const kelasInput = document.getElementById('kelas').value.trim();
 
-            const btnSubmit = e.target.querySelector('button[type="submit"]');
-            const originalBtnText = btnSubmit.innerHTML;
+            // Cari siswa
+            const student = studentsData.find(s => s.nis === nisInput && s.kelas.toLowerCase() === kelasInput.toLowerCase());
 
-            // Efek Loading
-            btnSubmit.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Mencari Data...`;
-            btnSubmit.disabled = true;
-            btnSubmit.classList.add('opacity-75', 'cursor-not-allowed');
-
-            try {
-                // Memanggil API Google Sheets
-                const response = await fetch(`${scriptURL}?nis=${nisInput}&kelas=${kelasInput}`);
-                const result = await response.json();
-
-                if (result.status === 'success') {
-                    currentUser = { role: 'student', data: result.data };
-                    document.getElementById('form-siswa').reset();
-                    renderStudentDashboard();
-                    switchView('student-view');
-                    showToast("Login berhasil!", "success");
-                } else {
-                    showToast(result.message || "NIS atau Kelas salah.", "error");
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                showToast("Gagal terhubung ke server. Periksa koneksi internet.", "error");
-            } finally {
-                // Kembalikan tombol ke kondisi semula
-                btnSubmit.innerHTML = originalBtnText;
-                btnSubmit.disabled = false;
-                btnSubmit.classList.remove('opacity-75', 'cursor-not-allowed');
+            if (student) {
+                currentUser = { role: 'student', data: student };
+                document.getElementById('form-siswa').reset();
+                renderStudentDashboard();
+                switchView('student-view');
+            } else {
+                showToast("NIS atau Kelas tidak ditemukan/salah.", "error");
             }
         }
 
@@ -138,6 +503,7 @@
         function logout() {
             currentUser = null;
             switchView('login-view');
+            // Reset tab login ke default (siswa)
             switchTab('siswa');
         }
 
@@ -147,22 +513,28 @@
             
             const data = currentUser.data;
             
+            // Set Identitas
             document.getElementById('student-name-display').textContent = data.nama;
             document.getElementById('student-nis-display').textContent = data.nis;
             document.getElementById('student-class-display').textContent = data.kelas;
+            
+            // Set Nilai & Peringkat
             document.getElementById('student-score-display').textContent = data.nilai;
             document.getElementById('student-grade-display').textContent = data.predikat;
             document.getElementById('student-rank-display').textContent = data.peringkat;
             
-            // Mengambil total siswa di kelas dari balikan Apps Script
-            document.getElementById('total-students-class').textContent = data.total_siswa_kelas || '-';
+            // Hitung total siswa di kelas yang sama
+            const totalInClass = studentsData.filter(s => s.kelas.toLowerCase() === data.kelas.toLowerCase()).length;
+            document.getElementById('total-students-class').textContent = totalInClass > 0 ? totalInClass : '-';
 
+            // Set UI berdasarkan Status
             const isTuntas = data.status.toLowerCase() === 'tuntas';
             const banner = document.getElementById('status-banner');
             const icon = document.getElementById('status-icon');
             const text = document.getElementById('status-text');
             const actionSection = document.getElementById('action-section');
 
+            // Reset classes
             banner.className = "py-6 px-6 text-center text-white flex flex-col items-center justify-center";
             
             if (isTuntas) {
@@ -188,8 +560,9 @@
             }
         }
 
-        // --- ADMIN DASHBOARD LOGIC (Demo Lokal) ---
+        // --- ADMIN DASHBOARD LOGIC ---
         function renderAdminDashboard() {
+            // Update Stats
             const total = studentsData.length;
             const tuntas = studentsData.filter(s => s.status.toLowerCase() === 'tuntas').length;
             const remedial = total - tuntas;
@@ -198,6 +571,7 @@
             document.getElementById('stat-tuntas').textContent = tuntas;
             document.getElementById('stat-remedial').textContent = remedial;
 
+            // Render Table
             const tbody = document.getElementById('admin-table-body');
             const emptyState = document.getElementById('empty-state');
             tbody.innerHTML = '';
@@ -212,14 +586,22 @@
                 studentsData.forEach(student => {
                     const tr = document.createElement('tr');
                     tr.className = "hover:bg-gray-50 transition-colors";
-                    const statusClass = student.status.toLowerCase() === 'tuntas' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200';
+                    
+                    const statusClass = student.status.toLowerCase() === 'tuntas' 
+                        ? 'bg-green-100 text-green-800 border-green-200' 
+                        : 'bg-red-100 text-red-800 border-red-200';
+
                     tr.innerHTML = `
                         <td class="px-6 py-3 border-b border-gray-100 font-mono text-gray-600">${student.nis}</td>
                         <td class="px-6 py-3 border-b border-gray-100 font-medium text-gray-900">${student.nama}</td>
                         <td class="px-6 py-3 border-b border-gray-100 text-gray-600">${student.kelas}</td>
                         <td class="px-6 py-3 border-b border-gray-100 font-bold text-gray-800">${student.nilai}</td>
                         <td class="px-6 py-3 border-b border-gray-100">${student.predikat}</td>
-                        <td class="px-6 py-3 border-b border-gray-100"><span class="px-2.5 py-1 rounded-md text-xs font-semibold border ${statusClass}">${student.status}</span></td>
+                        <td class="px-6 py-3 border-b border-gray-100">
+                            <span class="px-2.5 py-1 rounded-md text-xs font-semibold border ${statusClass}">
+                                ${student.status}
+                            </span>
+                        </td>
                     `;
                     tbody.appendChild(tr);
                 });
@@ -229,36 +611,69 @@
         function handleFileUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
+
+            // Reset input so same file can be selected again
             event.target.value = '';
-            if (!file.name.endsWith('.csv')) return showToast("Format file harus .csv", "error");
+
+            if (!file.name.endsWith('.csv')) {
+                showToast("Format file harus .csv", "error");
+                return;
+            }
 
             const reader = new FileReader();
-            reader.onload = function(e) { processCSV(e.target.result); };
-            reader.onerror = function() { showToast("Gagal membaca file.", "error"); };
+            reader.onload = function(e) {
+                const text = e.target.result;
+                parseAndSetData(text, false); // Diganti dari processCSV ke parseAndSetData
+            };
+            reader.onerror = function() {
+                showToast("Gagal membaca file.", "error");
+            };
             reader.readAsText(file);
         }
 
-        function processCSV(csvText) {
+        // Fungsi terpusat untuk memproses CSV (Bisa dari Fetch Google Sheets atau Upload File)
+        function parseAndSetData(csvText, isFromFetch = false) {
             try {
+                // Hapus \r jika ada, split per baris
                 const lines = csvText.replace(/\r/g, '').split('\n').filter(line => line.trim() !== '');
-                if (lines.length < 2) return showToast("File CSV kosong atau tidak memiliki data.", "error");
                 
+                if (lines.length < 2) {
+                    if(!isFromFetch) showToast("Data kosong.", "error");
+                    return;
+                }
+
+                // Ambil header dan standarisasi (lowercase)
                 const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                
+                // Cek kolom wajib
                 const requiredColumns = ['nis', 'nama', 'kelas', 'nilai'];
                 const missing = requiredColumns.filter(col => !headers.includes(col));
-                if (missing.length > 0) return showToast(`Kolom hilang: ${missing.join(', ')}. Harap gunakan template.`, "error");
+                if (missing.length > 0) {
+                    if(!isFromFetch) showToast(`Kolom hilang: ${missing.join(', ')}. Harap gunakan template.`, "error");
+                    return;
+                }
 
                 const newData = [];
+
                 for (let i = 1; i < lines.length; i++) {
                     const values = lines[i].split(',').map(v => v.trim());
-                    if(values.length !== headers.length) continue; 
+                    if(values.length !== headers.length) continue; // Skip baris rusak
 
                     let obj = {};
-                    headers.forEach((header, index) => obj[header] = values[index]);
+                    headers.forEach((header, index) => {
+                        obj[header] = values[index];
+                    });
+
+                    // Konversi tipe data
                     obj.nilai = Number(obj.nilai) || 0;
                     obj.peringkat = Number(obj.peringkat) || '-';
-                    if (!obj.status) obj.status = obj.nilai >= KKM ? 'Tuntas' : 'Remedial';
                     
+                    // Auto hitung status jika tidak ada di CSV
+                    if (!obj.status) {
+                        obj.status = obj.nilai >= KKM ? 'Tuntas' : 'Remedial';
+                    }
+                    
+                    // Auto hitung predikat jika tidak ada di CSV
                     if (!obj.predikat) {
                         if (obj.nilai >= 90) obj.predikat = 'A';
                         else if (obj.nilai >= 80) obj.predikat = 'B';
@@ -266,33 +681,50 @@
                         else if (obj.nilai >= 60) obj.predikat = 'D';
                         else obj.predikat = 'E';
                     }
+
                     newData.push(obj);
                 }
+
+                // Perbarui data utama
                 studentsData = newData;
-                renderAdminDashboard();
-                showToast(`Berhasil memuat ${newData.length} data siswa.`, "success");
+                
+                // Jika sedang di tab admin (saat upload manual), re-render tabel
+                if (!isFromFetch) {
+                    renderAdminDashboard();
+                    showToast(`Berhasil memuat ${newData.length} data siswa.`, "success");
+                } else {
+                    console.log(`Sinkronisasi berhasil: ${newData.length} data dari Google Sheets dimuat.`);
+                }
+
             } catch (error) {
                 console.error(error);
-                showToast("Terjadi kesalahan saat memproses CSV.", "error");
+                if(!isFromFetch) showToast("Terjadi kesalahan saat memproses CSV.", "error");
             }
         }
 
+        // Hapus fungsi processCSV() yang lama sepenuhnya karena sudah digantikan parseAndSetData()
+
         function clearData() {
+            // Gunakan custom confirm UI jika memungkinkan, tapi untuk kesederhanaan prototipe tanpa alert:
+            // Kita langsung hapus dan beri notif.
             studentsData = [];
             renderAdminDashboard();
-            showToast("Data lokal berhasil dihapus.", "success");
+            showToast("Semua data berhasil dihapus.", "success");
         }
 
         function downloadCSVTemplate() {
             const template = "nis,nama,kelas,nilai,predikat,peringkat,status\n123456,Budi Santoso,10-A,85,B,5,Tuntas\n654321,Siti Aminah,10-B,60,D,25,Remedial\n";
             const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement("a");
-            link.href = URL.createObjectURL(blob);
-            link.download = "template_nilai.csv";
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", "template_nilai.csv");
+            link.style.visibility = 'hidden';
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
         }
+
     </script>
 </body>
 </html>
