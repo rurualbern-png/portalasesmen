@@ -158,6 +158,24 @@
                 </div>
             </div>
         </div>
+
+        <!-- PANEL KONFIGURASI GOOGLE SHEETS -->
+        <div class="mt-6 bg-white w-full max-w-md rounded-2xl shadow-sm border border-gray-200 overflow-hidden fade-in">
+            <div class="p-4 bg-gray-50 border-b border-gray-100 flex justify-between items-center cursor-pointer hover:bg-gray-100 transition-colors" onclick="document.getElementById('config-panel').classList.toggle('hidden')">
+                <span class="text-sm font-bold text-gray-700"><i class="fas fa-link mr-2 text-primary-500"></i>Tautkan Google Sheets</span>
+                <i class="fas fa-chevron-down text-gray-400 text-xs"></i>
+            </div>
+            <div id="config-panel" class="p-5 hidden">
+                <p class="text-xs text-gray-500 mb-3">Masukkan link Publikasi CSV dari Google Sheets Anda di sini agar sistem dapat terhubung secara otomatis.</p>
+                <div class="flex flex-col gap-3">
+                    <input type="url" id="sheet-url-input" placeholder="Contoh: https://docs.google.com/.../pub?output=csv" class="w-full text-xs px-3 py-3 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all">
+                    <button type="button" onclick="updateSheetUrl()" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2.5 rounded-xl text-sm font-semibold shadow-md transition-all">
+                        Simpan & Hubungkan
+                    </button>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <!-- VIEW: STUDENT DASHBOARD -->
@@ -348,8 +366,12 @@
 
     <script>
         // --- STATE MANAGEMENT ---
-        // MASUKKAN URL CSV GOOGLE SHEETS ANDA DI SINI
-        const GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS6mKt544B50EZW0v0Rl5G-0kpHJAQkm2zcizk88vukI-lVeQQjos3boCdcDV4h17TWm7LrKFmXb8VE/pub?gid=0&single=true&output=csv"; 
+        // 1. HARDCODE LINK DI SINI: Paste link CSV Google Sheets Anda di antara tanda kutip di bawah ini.
+        // Ini memastikan link akan selalu terhubung meskipun file HTML dipindah ke HP atau komputer lain.
+        const DEFAULT_SHEET_URL = ""; 
+
+        // Menggunakan LocalStorage, jika kosong akan menggunakan DEFAULT_SHEET_URL
+        let currentSheetUrl = localStorage.getItem('app_sheet_url') || DEFAULT_SHEET_URL;
 
         // Data awal dikosongkan karena akan diisi dari Google Sheets
         let studentsData = [];
@@ -358,43 +380,100 @@
         // Batas nilai minimal tuntas
         const KKM = 75;
 
+        // Fungsi untuk menyimpan dan memperbarui URL dari UI
+        function updateSheetUrl() {
+            const input = document.getElementById('sheet-url-input');
+            let url = input.value.trim();
+            
+            if (!url) {
+                showToast("Link Google Sheets tidak boleh kosong!", "error");
+                return;
+            }
+
+            // Pastikan URL memiliki protokol https:// jika pengguna lupa mengetiknya
+            if (!url.startsWith('http://') && !url.startsWith('https://')) {
+                url = 'https://' + url;
+            }
+
+            // Simpan ke penyimpanan lokal browser
+            localStorage.setItem('app_sheet_url', url);
+            currentSheetUrl = url;
+            
+            // Tutup panel secara otomatis
+            document.getElementById('config-panel').classList.add('hidden');
+            
+            // Coba ambil data ulang
+            showToast("Menyimpan link dan menghubungkan...", "success");
+            fetchGoogleSheetData();
+        }
+
         // Fungsi untuk mengambil data otomatis dari Google Sheets
         async function fetchGoogleSheetData() {
             const syncStatus = document.getElementById('sync-status');
-            const url = GOOGLE_SHEET_CSV_URL;
+            const inputField = document.getElementById('sheet-url-input');
+            
+            // Set value di input field jika sudah ada data tersimpan di LocalStorage atau Default
+            if (inputField && currentSheetUrl) {
+                inputField.value = currentSheetUrl;
+            }
 
-            if (url === "URL_CSV_ANDA_DISINI" || !url || url.trim() === "") {
-                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500"></i> URL Google Sheet belum diisi';
+            // Jika URL kosong / belum disetting
+            if (!currentSheetUrl || currentSheetUrl.trim() === "") {
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-exclamation-triangle text-yellow-500"></i> Silakan tautkan link Google Sheets di bawah';
+                
+                // Buka panel otomatis untuk meminta input
+                const configPanel = document.getElementById('config-panel');
+                if(configPanel) configPanel.classList.remove('hidden');
                 return;
             }
+
+            const url = currentSheetUrl;
 
             // Validasi apakah URL yang dimasukkan benar-benar link Publikasi CSV
             if (!url.includes('/pub') && !url.includes('export?format=csv')) {
                 if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> Link salah! Gunakan link "Publikasikan ke web" (.csv)';
+                showToast("Link salah! Pastikan link berakhiran /pub?output=csv", "error");
+                const configPanel = document.getElementById('config-panel');
+                if(configPanel) configPanel.classList.remove('hidden');
                 return;
             }
 
             try {
                 if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-circle-notch fa-spin text-primary-500"></i> Menghubungkan ke Google Sheets...';
                 
-                // Fetch data dari URL CSV
-                const response = await fetch(url);
-                if (!response.ok) throw new Error("Gagal mengakses jaringan");
-                const csvText = await response.text();
+                // ANTI-CACHE: Tambahkan timestamp agar browser selalu mengambil data paling baru
+                const timestamp = new Date().getTime();
+                const fetchUrl = url + (url.includes('?') ? '&' : '?') + 'nocache=' + timestamp;
+                
+                let csvText = "";
+
+                try {
+                    // PERCOBAAN 1: Ambil data secara langsung (Akan berhasil jika di-hosting di server/Vercel)
+                    const response = await fetch(fetchUrl);
+                    if (!response.ok) throw new Error("Akses langsung ditolak (CORS)");
+                    csvText = await response.text();
+                } catch (directError) {
+                    console.warn("Akses langsung diblokir browser (CORS). Mengalihkan ke Proxy Server...");
+                    // PERCOBAAN 2 (JALUR ALTERNATIF): Gunakan CORS Proxy Publik (Berhasil untuk file:/// lokal)
+                    const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(fetchUrl)}`;
+                    const proxyResponse = await fetch(proxyUrl);
+                    if (!proxyResponse.ok) throw new Error("Gagal mengakses data melalui jalur alternatif.");
+                    csvText = await proxyResponse.text();
+                }
                 
                 // Cegah error jika ternyata yang dikembalikan adalah halaman HTML (bukan CSV)
                 if (csvText.trim().startsWith('<!DOCTYPE html>') || csvText.trim().startsWith('<html')) {
                     throw new Error("Link mengarah ke halaman web, bukan data CSV.");
                 }
 
-                // Parsing data menggunakan fungsi yang sudah kita buat
+                // Parsing data menggunakan fungsi
                 parseAndSetData(csvText, true);
                 
                 if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Terhubung dengan Google Sheets';
             } catch (error) {
                 console.error("Error fetching Google Sheet:", error);
-                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> Gagal mengambil data (Periksa link/koneksi)';
-                showToast("Gagal menghubungkan. Pastikan link Google Sheet sudah dipublikasikan sebagai CSV.", "error");
+                if(syncStatus) syncStatus.innerHTML = '<i class="fas fa-times-circle text-red-500"></i> Gagal terhubung (Periksa koneksi internet/link)';
+                showToast("Gagal mengambil data. Pastikan link Google Sheet sudah dipublikasikan sebagai CSV.", "error");
             }
         }
 
