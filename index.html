@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal Hasil Asesmen Siswa</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+   <script>
+        // --- STATE MANAGEMENT ---
+        // 1. PASTE URL DARI GOOGLE APPS SCRIPT DI SINI (Di dalam tanda kutip)
+        const scriptURL = 'https://script.google.com/macros/s/AKfycbwt7TkarvKHxn-Os6Cu4QhRwNXLgs_qsb8FMhJkFYTm6_fYLuoNd__OYimDJ8Wmo7FA/exec'; 
+
+        // Data lokal ini sekarang hanya digunakan untuk demo halaman Admin
+        let studentsData = [];
+        let currentUser = null; 
+        const KKM = 75;
+
+        // --- UI UTILITIES ---
+        function showToast(message, type = 'error') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            const bgColor = type === 'error' ? 'bg-red-600' : 'bg-green-600';
+            const icon = type === 'error' ? 'fa-exclamation-circle' : 'fa-check-circle';
+
+            toast.className = `${bgColor} text-white px-4 py-3 rounded-xl shadow-lg flex items-center gap-3 transition-all duration-300 transform translate-y-[-20px] opacity-0 pointer-events-auto`;
+            toast.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <span class="text-sm font-medium flex-1">${message}</span>
+                <button onclick="this.parentElement.remove()" class="text-white/80 hover:text-white">
+                    <i class="fas fa-times"></i>
+                </button>
+            `;
+            
+            container.appendChild(toast);
+            requestAnimationFrame(() => toast.classList.remove('translate-y-[-20px]', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        function togglePassword(inputId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(`eye-${inputId}`);
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.remove("fa-eye");
+                icon.classList.add("fa-eye-slash");
+            } else {
+                input.type = "password";
+                icon.classList.remove("fa-eye-slash");
+                icon.classList.add("fa-eye");
+            }
+        }
+
+        function switchView(viewId) {
+            document.getElementById('login-view').classList.add('hidden');
+            document.getElementById('student-view').classList.add('hidden');
+            document.getElementById('admin-view').classList.add('hidden');
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        function switchTab(tab) {
+            const formSiswa = document.getElementById('form-siswa');
+            const formAdmin = document.getElementById('form-admin');
+
+            if (tab === 'siswa') {
+                formSiswa.classList.remove('hidden');
+                if (formAdmin) formAdmin.classList.add('hidden');
+            } else {
+                if (formAdmin) formAdmin.classList.remove('hidden');
+                formSiswa.classList.add('hidden');
+            }
+        }
+
+        // --- AUTH LOGIC ---
+        // 2. FUNGSI LOGIN SISWA YANG TERHUBUNG KE GOOGLE SHEETS
+        async function handleLoginSiswa(e) {
+            e.preventDefault();
+            const nisInput = document.getElementById('nis').value.trim();
+            const kelasInput = document.getElementById('kelas').value.trim();
+
+            const btnSubmit = e.target.querySelector('button[type="submit"]');
+            const originalBtnText = btnSubmit.innerHTML;
+
+            // Efek Loading
+            btnSubmit.innerHTML = `<i class="fas fa-spinner fa-spin"></i> Mencari Data...`;
+            btnSubmit.disabled = true;
+            btnSubmit.classList.add('opacity-75', 'cursor-not-allowed');
+
+            try {
+                // Memanggil API Google Sheets
+                const response = await fetch(`${scriptURL}?nis=${nisInput}&kelas=${kelasInput}`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    currentUser = { role: 'student', data: result.data };
+                    document.getElementById('form-siswa').reset();
+                    renderStudentDashboard();
+                    switchView('student-view');
+                    showToast("Login berhasil!", "success");
+                } else {
+                    showToast(result.message || "NIS atau Kelas salah.", "error");
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showToast("Gagal terhubung ke server. Periksa koneksi internet.", "error");
+            } finally {
+                // Kembalikan tombol ke kondisi semula
+                btnSubmit.innerHTML = originalBtnText;
+                btnSubmit.disabled = false;
+                btnSubmit.classList.remove('opacity-75', 'cursor-not-allowed');
+            }
+        }
+
+        function handleLoginAdmin(e) {
+            e.preventDefault();
+            const userInput = document.getElementById('admin-user').value.trim();
+            const passInput = document.getElementById('admin-pass').value.trim();
+
+            if (userInput === 'admin' && passInput === 'admin123') {
+                currentUser = { role: 'admin' };
+                document.getElementById('form-admin').reset();
+                renderAdminDashboard();
+                switchView('admin-view');
+            } else {
+                showToast("Username atau password admin salah.", "error");
+            }
+        }
+
+        function logout() {
+            currentUser = null;
+            switchView('login-view');
+            switchTab('siswa');
+        }
+
+        // --- STUDENT DASHBOARD LOGIC ---
+        function renderStudentDashboard() {
+            if (!currentUser || currentUser.role !== 'student') return;
+            
+            const data = currentUser.data;
+            
+            document.getElementById('student-name-display').textContent = data.nama;
+            document.getElementById('student-nis-display').textContent = data.nis;
+            document.getElementById('student-class-display').textContent = data.kelas;
+            document.getElementById('student-score-display').textContent = data.nilai;
+            document.getElementById('student-grade-display').textContent = data.predikat;
+            document.getElementById('student-rank-display').textContent = data.peringkat;
+            
+            // Mengambil total siswa di kelas dari balikan Apps Script
+            document.getElementById('total-students-class').textContent = data.total_siswa_kelas || '-';
+
+            const isTuntas = data.status.toLowerCase() === 'tuntas';
+            const banner = document.getElementById('status-banner');
+            const icon = document.getElementById('status-icon');
+            const text = document.getElementById('status-text');
+            const actionSection = document.getElementById('action-section');
+
+            banner.className = "py-6 px-6 text-center text-white flex flex-col items-center justify-center";
+            
+            if (isTuntas) {
+                banner.classList.add("bg-emerald-500");
+                icon.className = "fas fa-check-circle text-5xl mb-2 drop-shadow-md";
+                text.textContent = "SELAMAT! ANDA TUNTAS";
+                
+                actionSection.innerHTML = `
+                    <p class="text-gray-700 font-medium mb-3">Pertahankan prestasimu!</p>
+                    <p class="font-bold text-gray-800">RuruAlbernEdu</p>
+                `;
+            } else {
+                banner.classList.add("bg-red-500");
+                icon.className = "fas fa-exclamation-triangle text-5xl mb-2 drop-shadow-md";
+                text.textContent = "ANDA HARUS REMEDIAL";
+                
+                actionSection.innerHTML = `
+                    <div class="bg-red-50 text-red-800 p-4 rounded-xl border border-red-100 text-left">
+                        <p class="text-sm mb-2"><i class="fas fa-info-circle mr-1"></i> <strong>Instruksi Remedial:</strong></p>
+                        <p class="text-sm">Silakan hubungi wali kelas atau guru mata pelajaran terkait untuk mendapatkan jadwal dan tugas remedial selambatnya 3 hari setelah pengumuman ini.</p>
+                    </div>
+                `;
+            }
+        }
+
+        // --- ADMIN DASHBOARD LOGIC (Demo Lokal) ---
+        function renderAdminDashboard() {
+            const total = studentsData.length;
+            const tuntas = studentsData.filter(s => s.status.toLowerCase() === 'tuntas').length;
+            const remedial = total - tuntas;
+
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-tuntas').textContent = tuntas;
+            document.getElementById('stat-remedial').textContent = remedial;
+
+            const tbody = document.getElementById('admin-table-body');
+            const emptyState = document.getElementById('empty-state');
+            tbody.innerHTML = '';
+
+            if (total === 0) {
+                emptyState.classList.remove('hidden');
+                tbody.parentElement.classList.add('hidden');
+            } else {
+                emptyState.classList.add('hidden');
+                tbody.parentElement.classList.remove('hidden');
+
+                studentsData.forEach(student => {
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-gray-50 transition-colors";
+                    const statusClass = student.status.toLowerCase() === 'tuntas' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200';
+                    tr.innerHTML = `
+                        <td class="px-6 py-3 border-b border-gray-100 font-mono text-gray-600">${student.nis}</td>
+                        <td class="px-6 py-3 border-b border-gray-100 font-medium text-gray-900">${student.nama}</td>
+                        <td class="px-6 py-3 border-b border-gray-100 text-gray-600">${student.kelas}</td>
+                        <td class="px-6 py-3 border-b border-gray-100 font-bold text-gray-800">${student.nilai}</td>
+                        <td class="px-6 py-3 border-b border-gray-100">${student.predikat}</td>
+                        <td class="px-6 py-3 border-b border-gray-100"><span class="px-2.5 py-1 rounded-md text-xs font-semibold border ${statusClass}">${student.status}</span></td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        function handleFileUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            event.target.value = '';
+            if (!file.name.endsWith('.csv')) return showToast("Format file harus .csv", "error");
+
+            const reader = new FileReader();
+            reader.onload = function(e) { processCSV(e.target.result); };
+            reader.onerror = function() { showToast("Gagal membaca file.", "error"); };
+            reader.readAsText(file);
+        }
+
+        function processCSV(csvText) {
+            try {
+                const lines = csvText.replace(/\r/g, '').split('\n').filter(line => line.trim() !== '');
+                if (lines.length < 2) return showToast("File CSV kosong atau tidak memiliki data.", "error");
+                
+                const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+                const requiredColumns = ['nis', 'nama', 'kelas', 'nilai'];
+                const missing = requiredColumns.filter(col => !headers.includes(col));
+                if (missing.length > 0) return showToast(`Kolom hilang: ${missing.join(', ')}. Harap gunakan template.`, "error");
+
+                const newData = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const values = lines[i].split(',').map(v => v.trim());
+                    if(values.length !== headers.length) continue; 
+
+                    let obj = {};
+                    headers.forEach((header, index) => obj[header] = values[index]);
+                    obj.nilai = Number(obj.nilai) || 0;
+                    obj.peringkat = Number(obj.peringkat) || '-';
+                    if (!obj.status) obj.status = obj.nilai >= KKM ? 'Tuntas' : 'Remedial';
+                    
+                    if (!obj.predikat) {
+                        if (obj.nilai >= 90) obj.predikat = 'A';
+                        else if (obj.nilai >= 80) obj.predikat = 'B';
+                        else if (obj.nilai >= 70) obj.predikat = 'C';
+                        else if (obj.nilai >= 60) obj.predikat = 'D';
+                        else obj.predikat = 'E';
+                    }
+                    newData.push(obj);
+                }
+                studentsData = newData;
+                renderAdminDashboard();
+                showToast(`Berhasil memuat ${newData.length} data siswa.`, "success");
+            } catch (error) {
+                console.error(error);
+                showToast("Terjadi kesalahan saat memproses CSV.", "error");
+            }
+        }
+
+        function clearData() {
+            studentsData = [];
+            renderAdminDashboard();
+            showToast("Data lokal berhasil dihapus.", "success");
+        }
+
+        function downloadCSVTemplate() {
+            const template = "nis,nama,kelas,nilai,predikat,peringkat,status\n123456,Budi Santoso,10-A,85,B,5,Tuntas\n654321,Siti Aminah,10-B,60,D,25,Remedial\n";
+            const blob = new Blob([template], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = "template_nilai.csv";
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+    </script>
+</body>
+</html>
