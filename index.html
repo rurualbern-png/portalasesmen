@@ -368,7 +368,7 @@
         // --- STATE MANAGEMENT ---
         // 1. HARDCODE LINK DI SINI: Paste link CSV Google Sheets Anda di antara tanda kutip di bawah ini.
         // Ini memastikan link akan selalu terhubung meskipun file HTML dipindah ke HP atau komputer lain.
-        const DEFAULT_SHEET_URL = ""; 
+        const DEFAULT_SHEET_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vS6mKt544B50EZW0v0Rl5G-0kpHJAQkm2zcizk88vukI-lVeQQjos3boCdcDV4h17TWm7LrKFmXb8VE/pub?output=csv"; 
 
         // Menggunakan LocalStorage, jika kosong akan menggunakan DEFAULT_SHEET_URL
         let currentSheetUrl = localStorage.getItem('app_sheet_url') || DEFAULT_SHEET_URL;
